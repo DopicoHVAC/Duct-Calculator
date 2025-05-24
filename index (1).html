@@ -1,0 +1,106 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Duct Size Calculator</title>
+  <link rel="manifest" href="manifest.json" />
+  <meta name="theme-color" content="#007bff"/>
+  <style>
+    body { font-family: Arial, sans-serif; padding: 1rem; background: #f9f9f9; }
+    h1 { color: #007bff; }
+    .room, .result, .unit-info { margin-bottom: 1rem; padding: 1rem; background: #fff; border-radius: 8px; }
+    label { display: block; margin-top: 0.5rem; }
+    input, select { padding: 0.5rem; margin-top: 0.2rem; width: 100%; }
+    button { background: #007bff; color: white; border: none; padding: 0.75rem; margin-top: 1rem; width: 100%; border-radius: 5px; cursor: pointer; }
+  </style>
+  <script>
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('service-worker.js');
+    }
+
+    function addRoom() {
+      const container = document.getElementById('rooms');
+      const div = document.createElement('div');
+      div.className = 'room';
+      div.innerHTML = `
+        <label>Nombre de la habitación:</label>
+        <input type="text" placeholder="Ej. Dormitorio, Cocina" class="room-name"/>
+        <label>Pies cuadrados:</label>
+        <input type="number" min="0" class="sqft" placeholder="Ej. 120"/>
+        <label>CFM personalizado (opcional):</label>
+        <input type="number" min="0" class="cfm" placeholder="Calculado automáticamente si se deja vacío"/>
+        <label>¿Tiene retorno?</label>
+        <select class="return">
+          <option value="no">No</option>
+          <option value="yes">Sí</option>
+        </select>
+      `;
+      container.appendChild(div);
+    }
+
+    function calculate() {
+      const frictionRate = parseFloat(document.getElementById('friction').value);
+      const ductType = document.getElementById('ductType').value;
+      const resultDiv = document.getElementById('result');
+      const tonnage = parseFloat(document.getElementById('tonnage').value) || 0;
+      let totalCFM = 0, roomData = [];
+
+      const rooms = document.querySelectorAll('#rooms .room');
+      rooms.forEach(room => {
+        const sqft = parseFloat(room.querySelector('.sqft').value);
+        const cfmInput = parseFloat(room.querySelector('.cfm').value);
+        const hasReturn = room.querySelector('.return').value === 'yes';
+        const roomCFM = cfmInput || sqft * 1;
+        totalCFM += roomCFM;
+        roomData.push({ sqft, roomCFM, hasReturn });
+      });
+
+      let output = `<p><strong>Total CFM:</strong> ${totalCFM.toFixed(1)} CFM</p>`;
+
+      roomData.forEach((room, idx) => {
+        const diameter = Math.sqrt((room.roomCFM * 144) / (Math.PI * 800)) * 2;
+        output += `<p>Habitación ${idx+1}: <strong>${room.roomCFM.toFixed(1)} CFM</strong>, Ducto redondo recomendado: <strong>${diameter.toFixed(1)} in</strong></p>`;
+        if (room.hasReturn) {
+          const returnDiameter = Math.sqrt((room.roomCFM * 144) / (Math.PI * 500)) * 2;
+          output += `<p>&nbsp;&nbsp;&nbsp;Retorno sugerido: <strong>${returnDiameter.toFixed(1)} in</strong> diámetro</p>`;
+        }
+      });
+
+      if (tonnage) {
+        const unitCFM = tonnage * 400;
+        output += `<p><strong>Tonelaje especificado:</strong> ${tonnage} ton = ${unitCFM} CFM</p>`;
+        output += `<p style="color:${totalCFM > unitCFM ? 'red' : 'green'};">${totalCFM > unitCFM ? '¡Advertencia! El total de CFM excede la capacidad de la unidad.' : 'CFM dentro de capacidad de la unidad.'}</p>`;
+      }
+
+      resultDiv.innerHTML = output;
+    }
+  </script>
+</head>
+<body>
+  <h1>Duct Size Calculator</h1>
+
+  <div class="unit-info">
+    <label>Tonelaje total de A/C:</label>
+    <input type="number" id="tonnage" step="0.1" placeholder="Ej. 3"/>
+  </div>
+
+  <div id="rooms"></div>
+  <button onclick="addRoom()">+ Agregar habitación</button>
+
+  <div class="room">
+    <label>Tipo de ducto principal:</label>
+    <select id="ductType">
+      <option value="round">Redondo</option>
+      <option value="rect">Rectangular</option>
+    </select>
+    <label>Tasa de fricción (friction rate):</label>
+    <input type="number" id="friction" value="0.1" step="0.01"/>
+  </div>
+
+  <button onclick="calculate()">Calcular</button>
+
+  <div id="result" class="result"></div>
+</body>
+</html>
